@@ -27,3 +27,7 @@ transformers>=4.43
 scikit-learn>=1.4
 torch-geometric>=2.5
 pyarrow>=16.0
+
+# jupyter
+seaborn>=0.13.1
+matplotlib>=3.9.2
