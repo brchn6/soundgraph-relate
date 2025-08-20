@@ -106,6 +106,34 @@ class SCClient:
         # Endpoint path is /search/tracks on api-v2; on v1 it often 403's
         return self._get("/search/tracks", {"q": q, "limit": limit, "offset": offset})
 
+     
+    #  user and track endpoints
+    def track_favoriters(self, track_id: int, limit: int = 50, offset: int = 0):
+        # In some environments this is /tracks/{id}/favoriters or /likes
+        try:
+            return self._get(f"/tracks/{track_id}/favoriters", {"limit": limit, "offset": offset})
+        except Exception:
+            try:
+                return self._get(f"/tracks/{track_id}/likes", {"limit": limit, "offset": offset})
+            except Exception:
+                return []
+
+    def track_reposters(self, track_id: int, limit: int = 50, offset: int = 0):
+        try:
+            return self._get(f"/tracks/{track_id}/reposters", {"limit": limit, "offset": offset})
+        except Exception:
+            return []
+
+    def user_likes(self, user_id: int, limit: int = 50, offset: int = 0):
+        try:
+            return self._get(f"/users/{user_id}/favorites", {"limit": limit, "offset": offset})
+        except Exception:
+            try:
+                return self._get(f"/users/{user_id}/likes", {"limit": limit, "offset": offset})
+            except Exception:
+                return []
+    
+
 def make_client_from_env() -> SCClient:
     client_id = os.getenv("SOUNDCLOUD_CLIENT_ID")
     access_token = os.getenv("SOUNDCLOUD_ACCESS_TOKEN")  # preferred
