@@ -83,3 +83,16 @@ pipeline_url:
 	python -m sgr.db.load_playlists
 	$(MAKE) cooccur
 	TRACK_URL=$(TRACK_URL) python scripts/unveil.py
+
+export_corpus:
+	python scripts/export_training_corpus.py
+export_pairs:
+	python scripts/export_pairs.py
+graph_tensors:
+	python scripts/build_graph_tensors.py
+train_text:
+	python scripts/train_text_baseline.py
+train_gnn:
+	python scripts/train_gnn_baseline.py
+
+	
