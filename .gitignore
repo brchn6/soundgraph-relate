@@ -1,0 +1,13 @@
+# python
+__pycache__/
+*.pyc
+.venv/
+.env
+# data
+data/raw/
+data/staging/
+data/logs/
+# notebooks
+.ipynb_checkpoints/
+# os
+.DS_Store
