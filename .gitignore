@@ -1,13 +1,63 @@
-# python
-__pycache__/
+# Python-specific files
 *.pyc
-.venv/
+*.pyo
+__pycache__/
+*.pyd
+*.swp
+
+# Conda environment files
+.env/
+.conda/
+.sgr/
+
+# Virtual environment files
+venv/
+env/
 .env
-# data
-data/raw/
-data/staging/
-data/logs/
-# notebooks
+ENV/
+.venv/
+
+# Jupyter notebook checkpoints
 .ipynb_checkpoints/
-# os
+
+# Python egg info (installed packages)
+*.egg-info/
+
+# Distribution / packaging
+.Python
+build/
+dist/
+*.egg
+*.tar.gz
+*.whl
+
+# Logs and temporary files
+data/logs/
+*.log
+*.tmp
+
+# System files (macOS / Windows)
 .DS_Store
+Thumbs.db
+
+# IDE-specific files (e.g., VSCode, PyCharm)
+.vscode/
+.idea/
+
+# SQL database files
+*.sql
+*.sqlite
+*.db
+*.parquet
+
+# Temporary data files
+data/raw/*.jsonl
+
+# Miscellaneous files
+*.bak
+*.swp
+
+
+# CLI
+CLI*
+DirTrack*

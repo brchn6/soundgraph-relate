@@ -1,0 +1,19 @@
+soundcloud:
+  client_id_env: SOUNDCLOUD_CLIENT_ID
+  base_url: "https://api.soundcloud.com"
+  user_agent: "soundgraph-relate/0.1 (community-tool)"
+  reqs_per_minute: 50
+  backoff:
+    start_seconds: 2
+    max_seconds: 60
+store:
+  raw_dir: "data/raw"
+  staging_dir: "data/staging"
+  logs_dir: "data/logs"
+db:
+  driver: "postgresql+psycopg2"
+  host_env: "PGHOST"
+  port_env: "PGPORT"
+  user_env: "PGUSER"
+  pwd_env: "PGPASSWORD"
+  db_env: "PGDATABASE"
