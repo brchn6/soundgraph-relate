@@ -45,7 +45,6 @@ Thumbs.db
 .idea/
 
 # SQL database files
-*.sql
 *.sqlite
 *.db
 *.parquet
@@ -61,3 +60,6 @@ data/raw/*.jsonl
 # CLI
 CLI*
 DirTrack*
+
+# doc 
+doc/
