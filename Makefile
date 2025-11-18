@@ -57,15 +57,16 @@ fmt:
 
 # Refresh the token and make an API request
 refresh_and_request:
-	python scripts/refresh_and_request.py
+	python utils/refresh_and_request.py
 
 # Test /home/barc/dev/soundgraph-relate/tests/test_soundcloud_api.py
 test:
+	make refresh_and_request
 	python  tests/test_soundcloud_api.py
 
 # Doctor script for checking the system health
 doctor:
-	python scripts/doctor.py
+	python utils/doctor.py
 
 # Create schema extras
 schema_extras:
@@ -88,12 +89,4 @@ export_corpus:
 	python scripts/export_training_corpus.py
 export_pairs:
 	python scripts/export_pairs.py
-graph_tensors:
-	python scripts/build_graph_tensors.py
-train_text:
-	python scripts/train_text_baseline.py
-train_gnn:
-	python scripts/train_gnn_baseline.py
-
-	
 	

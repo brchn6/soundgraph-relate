@@ -1,296 +1,448 @@
-# SoundGraph Relate
+# 🎵 SoundGraph
 
-**SoundGraph Relate** is a Python-based project that builds a **community tool for discovering related tracks** using SoundCloud public metadata.
-It supports:
+**SoundGraph** is a data-driven music discovery engine that builds knowledge graphs from SoundCloud metadata to uncover hidden relationships between tracks, artists, and users.
 
-* fetching SoundCloud track/playlist/user data,
-* cleaning + storing in a relational DB,
-* unveiling hidden layers (related tracks, playlists, artist connections),
-* preparing large datasets,
-* and training machine learning / neural network models on audio + text + graph signals.
+## 🎯 **What Does SoundGraph Do?**
 
----
+SoundGraph goes **beyond SoundCloud's built-in recommendations** by creating a comprehensive knowledge graph that reveals:
 
-## Why This Exists
+- **📊 Track Relationships**: Which songs appear together in playlists (co-occurrence analysis)
+- **🎤 Artist Connections**: How artists are linked through collaborations, shared playlists, and fan overlap
+- **👥 User Similarity**: Find users with similar music taste based on their likes and playlists
+- **🔍 Deep Discovery**: Get recommendations based on complex relationship patterns, not just individual track similarity
 
-Music discovery is siloed and often opaque. This project aims to **empower researchers and communities** to:
-
-* **Unveil Hidden Layers** around a given track:
-
-  * **Related Tracks** — similarity by co-playlist, tags, genre, artist collaborations.
-  * **User Engagement** — likes, reposts, comments (when available).
-  * **Playlists** — playlists containing the track and contextual co-occurrences.
-  * **Artist Connections** — shared playlists, collaborations, follower networks.
-
-* **Build Datasets** — a structured, extensible SQL + parquet layer for MIR research.
-
-* **Train Models** — downstream deep learning on text, tags, and (if permitted) audio previews.
+### **Why Build This?**
+SoundCloud's algorithm is a "black box" - you can't see WHY you got a recommendation. SoundGraph creates a **transparent, queryable music knowledge graph** where you can:
+- Input a track and see exactly WHY certain tracks are related
+- Find the "missing links" between two different songs/artists
+- Discover music through community behavior patterns (what do people who like X also like?)
+- Build custom recommendation models on top of rich relational data
 
 ---
 
-## Requirements
+## 🏗️ **How SoundGraph Works**
 
-* Python 3.11+
-* PostgreSQL (local or remote)
-* Conda (recommended)
-* Dependencies in `requirements.txt`
+### **The Knowledge Graph Approach**
+1. **Data Collection**: Fetches public metadata from SoundCloud (tracks, playlists, users, interactions)
+2. **Relationship Extraction**: Builds a graph where edges represent relationships:
+   - Track ↔ Track (co-occurrence in playlists)
+   - User ↔ Track (likes, reposts)
+   - User ↔ User (similar taste patterns)
+   - Artist ↔ Artist (collaboration networks)
+3. **Query Engine**: Provides APIs to query relationships and find recommendations
+4. **ML Ready**: Exports graph data for training recommendation models
+
+### **Key Innovation: Co-occurrence Analysis**
+Instead of just analyzing individual track features, SoundGraph looks at **behavioral patterns**:
+- If tracks A and B appear in many playlists together → they're related
+- If users who like track X also like track Y → similarity signal
+- If user P and user Q have 70% playlist overlap → similar taste
 
 ---
 
-## Installation
+## 🚀 **Quick Start**
 
+### **Prerequisites**
+- Python 3.11+
+- PostgreSQL (local installation)
+- SoundCloud API access (OAuth token preferred)
+
+### **Installation**
 ```bash
-git clone https://github.com/your-username/soundgraph-relate.git
-cd soundgraph-relate
+git clone https://github.com/your-username/soundgraph.git
+cd soundgraph
 
-# set up env
+# Setup environment
 conda create -y -n sgr python=3.11
 conda activate sgr
 pip install -r requirements.txt
+pip install -e .
 ```
 
-Set environment variables in `.env`:
+### **Configuration**
+Create `.env` file:
+```env
+# SoundCloud API
+SOUNDCLOUD_ACCESS_TOKEN=your_oauth_token_here
+SOUNDCLOUD_CLIENT_ID=your_client_id_here
 
-```dotenv
-# OAuth (preferred)
-SOUNDCLOUD_ACCESS_TOKEN=...
-
-# (optional) fallback
-SOUNDCLOUD_CLIENT_ID=...
-
-# Postgres
+# PostgreSQL Database
 PGHOST=localhost
 PGPORT=5432
 PGUSER=sgr
-PGPASSWORD=sgr_password
+PGPASSWORD=your_password
 PGDATABASE=sgr
 
-# sample query
+# Sample data
 SAMPLE_QUERY=lofi
 ```
 
 ---
 
-## Usage: Script by Script
+## 📋 **Complete Workflow Guide**
 
-### 1. Ingest data
+### **Phase 1: Data Collection & Setup**
 
-`scripts/ingest_sample.py`
-Fetches track metadata from SoundCloud API (OAuth preferred).
-
+#### **Step 1: Initialize Database**
 ```bash
-SAMPLE_QUERY="lofi" python scripts/ingest_sample.py
+# Ensure PostgreSQL is running
+sudo systemctl start postgresql
+
+# Create database and user (run once)
+sudo -u postgres psql
+CREATE DATABASE sgr;
+CREATE USER sgr WITH PASSWORD 'your_password';
+GRANT ALL PRIVILEGES ON DATABASE sgr TO sgr;
+\q
 ```
 
-→ saves raw JSONL to `data/raw/`.
-
----
-
-### 2. Clean data
-
-`sgr.clean.clean_tracks`
-Normalizes raw JSONL → parquet, adds engagement score.
-
+#### **Step 2: Collect Sample Data**
 ```bash
+# Fetch tracks by search query
+SAMPLE_QUERY="lofi hip hop" python scripts/ingest_sample.py
+```
+**What this does**: Searches SoundCloud for tracks matching your query and saves raw JSON data to `data/raw/tracks_search_*.jsonl`
+
+**Expected output**: `Found 50 tracks for query 'lofi hip hop', saved to data/raw/tracks_search_lofi_hip_hop_20250909.jsonl`
+
+#### **Step 3: Clean and Normalize Data**
+```bash
+# Process raw JSON into structured data
 python -m sgr.clean.clean_tracks
 ```
+**What this does**: Converts raw JSON to structured parquet files with engagement scores, normalized tags, and clean metadata.
 
-→ saves parquet to `data/staging/`.
+**Expected output**: `wrote data/staging/tracks_search_lofi_hip_hop_20250909.parquet 50`
 
----
-
-### 3. Load into Postgres
-
-`sgr.db.load_tracks`
-Creates schema (if not exists) and upserts artists + tracks.
-
+#### **Step 4: Load into Database**
 ```bash
+# Create schema and load tracks + artists
 python -m sgr.db.load_tracks
 ```
+**What this does**: Creates database tables and loads artists + tracks with proper relationships.
 
----
+**Expected output**: Database tables created, artists and tracks inserted.
 
-### 4. Resolve & crawl a track
+### **Phase 2: Build Knowledge Graph**
 
-`scripts/resolve_and_crawl.py`
-Given a track URL, pulls its owner’s playlists + tracks in those playlists.
-
+#### **Step 5: Crawl Track Neighborhood**
 ```bash
-TRACK_URL="https://soundcloud.com/artist/track" python scripts/resolve_and_crawl.py
+# Deep-dive into a specific track's ecosystem
+TRACK_URL="https://soundcloud.com/artist/track-name" python scripts/resolve_and_crawl.py
+```
+**What this does**: Takes a track URL and crawls the artist's entire playlist ecosystem, collecting:
+- All playlists by that artist
+- All tracks in those playlists
+- User interactions (likes, if available)
+
+**Expected output**: 
+```
+INFO: resolve: https://soundcloud.com/artist/track-name
+INFO: track_id=123456 by user_id=789
+INFO: playlists fetched: 15
+INFO: playlist track entries: 342
+SUCCESS: crawl complete
 ```
 
----
-
-### 5. Clean + load playlists
-
-`sgr.clean.clean_playlists` → parquet
-`sgr.db.load_playlists` → Postgres
-
+#### **Step 6: Process Playlists & Users**
 ```bash
+# Clean and load playlist data
 python -m sgr.clean.clean_playlists
 python -m sgr.db.load_playlists
 ```
+**What this does**: Normalizes playlist data and loads users, playlists, and playlist_tracks relationships.
+
+#### **Step 7: Build Co-occurrence Analysis**
+```bash
+# Create advanced schema with materialized views
+python scripts/create_schema_extras.py
+
+# Build track co-occurrence matrix
+python scripts/refresh_cooccur.py
+```
+**What this does**: Creates a materialized view that calculates how often tracks appear together in playlists - the core of the knowledge graph.
+
+### **Phase 3: Query & Discover**
+
+#### **Step 8: Unveil Relationships**
+```bash
+# Analyze a track's complete relationship network
+TRACK_URL="https://soundcloud.com/artist/track-name" python scripts/unveil.py
+```
+**What this does**: Shows the complete "relationship profile" of a track:
+- Basic track info
+- Playlists containing it
+- Related tracks (by co-occurrence)
+- Related tracks (by tag similarity)
+- Artist connections
+- Engagement patterns
+
+**Expected output**:
+```
+=== TRACK SUMMARY ===
+Track: "Chill Lo-Fi Beats" by LoFiArtist
+Genre: Hip Hop, Plays: 50,431, Likes: 1,203
+
+=== PLAYLISTS CONTAINING THIS TRACK ===
+- "Study Vibes" (15 tracks)
+- "Late Night Coding" (23 tracks)
+
+=== RELATED TRACKS (CO-OCCURRENCE) ===
+1. "Midnight Study Session" - appeared together 8 times
+2. "Coffee Shop Ambience" - appeared together 6 times
+
+=== RELATED TRACKS (TAG SIMILARITY) ===
+1. "Dreamy Loops" - 85% tag overlap
+2. "Focus Beats" - 72% tag overlap
+```
 
 ---
 
-### 6. Build co-occurrence view
+## 🔧 **Script Reference & Validation**
 
-`scripts/create_schema_extras.py` adds playlists/users tables + materialized view.
-`scripts/refresh_cooccur.py` refreshes the view.
+### **Core Scripts** ✅
+
+| Script | Purpose | Input | Output | Validation |
+|--------|---------|-------|--------|------------|
+| `ingest_sample.py` | Fetch SoundCloud data | Search query | Raw JSONL files | Check `data/raw/` for new files |
+| `clean_tracks.py` | Normalize track data | Raw JSONL | Structured parquet | Check `data/staging/` for parquet files |
+| `load_tracks.py` | Load to database | Parquet files | DB records | `SELECT COUNT(*) FROM tracks;` |
+| `resolve_and_crawl.py` | Deep crawl track ecosystem | Track URL | Playlist/user data | Check for new user_*_playlists.jsonl files |
+| `clean_playlists.py` | Normalize playlist data | Raw playlist JSONL | Structured parquet | Check `data/staging/` for playlist parquets |
+| `load_playlists.py` | Load playlists to DB | Playlist parquets | DB records | `SELECT COUNT(*) FROM playlists;` |
+| `create_schema_extras.py` | Advanced DB schema | None | Enhanced tables | Check for `track_cooccurrence` view |
+| `refresh_cooccur.py` | Update relationships | Existing data | Updated view | `SELECT COUNT(*) FROM track_cooccurrence;` |
+| `unveil.py` | Query relationships | Track URL/ID | Relationship report | Visual relationship output |
+
+### **Quick Validation Commands**
+```bash
+# Check data pipeline health
+make test  # Run basic API tests
+
+# Check database content
+psql -h localhost -U sgr -d sgr -c "
+  SELECT 
+    (SELECT COUNT(*) FROM artists) as artists,
+    (SELECT COUNT(*) FROM tracks) as tracks,
+    (SELECT COUNT(*) FROM playlists) as playlists,
+    (SELECT COUNT(*) FROM track_cooccurrence) as relationships;
+"
+
+# Validate knowledge graph
+psql -h localhost -U sgr -d sgr -c "
+  SELECT track_id_a, track_id_b, together 
+  FROM track_cooccurrence 
+  ORDER BY together DESC 
+  LIMIT 10;
+"
+```
+
+---
+
+## 🎯 **Complete Pipeline Example**
+
+Here's how to run the complete pipeline for a single track:
 
 ```bash
+# 1. Collect general data about a genre
+SAMPLE_QUERY="ambient electronic" python scripts/ingest_sample.py
+python -m sgr.clean.clean_tracks
+python -m sgr.db.load_tracks
+
+# 2. Deep-dive into a specific track's ecosystem
+TRACK_URL="https://soundcloud.com/ambient-artist/floating-dreams" python scripts/resolve_and_crawl.py
+python -m sgr.clean.clean_playlists
+python -m sgr.db.load_playlists
+
+# 3. Build knowledge graph
 python scripts/create_schema_extras.py
 python scripts/refresh_cooccur.py
+
+# 4. Query relationships
+TRACK_URL="https://soundcloud.com/ambient-artist/floating-dreams" python scripts/unveil.py
 ```
 
----
-
-### 7. Unveil hidden layers
-
-`scripts/unveil.py`
-Given a track id or URL, prints:
-
-* track summary
-* playlists containing it
-* related tracks (co-playlist)
-* related tracks (tag overlap)
-* artist connections
-* engagement (if available)
-
+**Or use the automated pipeline:**
 ```bash
-TRACK_URL="https://soundcloud.com/artist/track" python scripts/unveil.py
+make pipeline TRACK_URL="https://soundcloud.com/ambient-artist/floating-dreams"
 ```
 
 ---
 
-## Project Structure
+## 📊 **Project Architecture**
 
 ```
-.
-├── configs/              # config.yaml + .env
-├── data/raw              # raw jsonl
-├── data/staging          # cleaned parquet
-├── sql/schema.sql        # base schema
-├── scripts/              # orchestration scripts
-├── src/sgr/              # library code (clean, db, io, utils)
-└── tests/                # pytest-based tests
-```
-
----
-
-## Large Dataset Instructions
-
-When scaling beyond small samples:
-
-1. **Batch ingestion**
-   Use multiple queries (`hiphop`, `techno`, `ambient`) or crawl curator accounts.
-   Example:
-
-   ```bash
-   for q in "lofi" "house" "techno"; do SAMPLE_QUERY="$q" python scripts/ingest_sample.py; done
-   ```
-
-2. **Incremental updates**
-   Each JSONL is append-only. Cleaning + loading scripts handle deduplication/upserts.
-
-3. **Database performance**
-
-   * Create indexes (already in schema).
-   * Use `REFRESH MATERIALIZED VIEW CONCURRENTLY track_cooccurrence;` for large DBs.
-
-4. **Storage**
-
-   * Expect \~1–2 KB per track JSON.
-   * 1M tracks → \~2 GB raw JSON.
-   * Use parquet + Postgres for efficient access.
-
----
-
-## Training Neural Networks
-
-Once you’ve built a dataset, you can train models for **track embeddings**:
-
-1. **Text embeddings**
-   Use `sentence-transformers` on titles + tags + descriptions.
-
-   ```python
-   from sentence_transformers import SentenceTransformer
-   model = SentenceTransformer("all-mpnet-base-v2")
-   emb = model.encode(["dreamy lofi beats"])
-   ```
-
-2. **Graph embeddings**
-   Export playlist/track/artist edges to PyTorch Geometric.
-
-   ```python
-   from torch_geometric.data import Data
-   # build edge_index from playlist_tracks
-   ```
-
-3. **Audio embeddings**
-   If SoundCloud preview streams are allowed in your app context, extract CLAP/OpenL3 embeddings with `torchaudio`.
-
-4. **Fusion + training**
-   Train a neural net (e.g. contrastive multi-view) combining modalities.
-
-   ```python
-   # pseudo-code
-   z_text = text_encoder(title+tags)
-   z_audio = audio_encoder(waveform)
-   z_graph = gnn(node_features, edge_index)
-   z_fused = fusion([z_text, z_audio, z_graph])
-   ```
-
-5. **Objectives**
-
-   * **Contrastive** (align tracks co-occurring in playlists)
-   * **Ranking** (BPR on co-listens)
-   * **Classification** (predict genre/tags)
-
-6. **Evaluation**
-   Use held-out playlists for Recall\@K, NDCG\@K.
-
----
-
-## Example Pipeline (end-to-end)
-
-```bash
-# 1. ingest a query
-SAMPLE_QUERY="lofi" python scripts/ingest_sample.py
-
-# 2. clean
-python -m sgr.clean.clean_tracks
-
-# 3. load
-python -m sgr.db.load_tracks
-
-# 4. crawl neighborhood of a track
-TRACK_URL="https://soundcloud.com/artist/track" python scripts/resolve_and_crawl.py
-python -m sgr.clean.clean_playlists
-python -m sgr.db.load_playlists
-
-# 5. refresh cooccurrence view
-python scripts/refresh_cooccur.py
-
-# 6. unveil
-TRACK_URL="https://soundcloud.com/artist/track" python scripts/unveil.py
+soundgraph/
+├── scripts/           # Main orchestration scripts
+│   ├── ingest_sample.py       # SoundCloud API data collection
+│   ├── resolve_and_crawl.py   # Deep ecosystem crawling
+│   ├── create_schema_extras.py # Advanced database schema
+│   ├── refresh_cooccur.py     # Knowledge graph updates
+│   └── unveil.py             # Relationship query engine
+├── src/sgr/          # Core library
+│   ├── clean/         # Data normalization
+│   ├── db/           # Database operations
+│   └── io/           # SoundCloud API client
+├── sql/schema.sql    # Database schema
+├── data/
+│   ├── raw/          # Raw JSON from API
+│   └── staging/      # Processed parquet files
+└── configs/          # Configuration files
 ```
 
 ---
 
-## Testing
+## 🔮 **Future Development**
 
-```bash
-pytest tests/
-```
+### **Phase 2: Backend API** (Next)
+- REST API for querying relationships
+- Real-time recommendation endpoints
+- Graph visualization endpoints
+
+### **Phase 3: Frontend Interface** (Later)
+- Web interface for exploration
+- Interactive graph visualization
+- User recommendation interface
+
+### **Phase 4: Machine Learning** (Advanced)
+- Graph Neural Networks for recommendations
+- Audio feature analysis integration
+- Collaborative filtering enhancement
 
 ---
 
-## Next Steps
+## 🤝 **Contributing**
 
-* Add batch crawlers for popular playlists to enrich co-occurrence graph.
-* Extend cleaning scripts to handle likes/reposts/comments.
-* Train first baseline **text-only related track model**.
-* Add Streamlit/Gradio frontend to demo.
+This project is designed for community collaboration:
+
+1. **Data Scientists**: Extend the knowledge graph algorithms
+2. **Backend Developers**: Build the API layer
+3. **Frontend Developers**: Create visualization interfaces
+4. **ML Engineers**: Develop recommendation models
+
+See `CONTRIBUTING.md` for guidelines.
+
+---
+
+## 📄 **License**
+
+MIT License - Build amazing music discovery tools!
 
 
+
+
+
+
+
+
+
+
+---
+## 🔜 Next Steps
+
+This roadmap layers a **knowledge-graph–enhanced, multi-task recommender** on top of SoundGraph, inspired by the MMSS\_MKR framework (multi-task, multi-channel, multi-loss) and its KG construction workflow. The goal: keep SoundGraph’s transparent co-occurrence engine, while adding **joint training with KG embeddings**, **cross-&-compression feature sharing**, and **clear evaluation/ablation**.
+
+### 1) Expand the Knowledge Graph (KG)
+
+* **Add item–attribute triples** beyond co-occurrence edges:
+
+  * `Track —[has_genre]→ Genre`, `Track —[by_artist]→ Artist`, `Track —[in_playlist]→ Playlist`, `Artist —[collab_with]→ Artist`.
+  * Where available, include `Track —[has_tag]→ Tag`, `Track —[released_on]→ Date`, `Track —[label]→ Label`.
+* **Normalize and fuse entities** (dedupe artists, playlists, tags) with an entity alignment pass; keep provenance for transparency.
+* **Export triples** to `data/graph/triples.parquet` with schema: `(head, relation, tail, weight, source)`.
+
+> Why: The paper’s KG is built from structured + semi/ unstructured sources, then fused and cleaned into triples before embedding; mirroring that improves signal breadth.
+
+### 2) Add a KG Embedding Module (KGE)
+
+* Implement a KGE trainer supporting **TransE / TransH / TransR** backends (start with TransE).
+* Inputs: `triples.parquet`; Outputs: `embeddings/{entity}.npy`, `embeddings/{relation}.npy`.
+* Provide a CLI:
+
+  ```bash
+  python -m sgr.kge.train --triples data/graph/triples.parquet --model transe --dim 128 --epochs 50
+  ```
+* Ship a **score function** helper that supports multiple activations (sigmoid / tanh / softsign / softplus) for robust triple scoring, as in the paper’s multi-calculation design.
+
+### 3) Multi-Task Joint Training (MMSS-style)
+
+* Create a **joint trainer** that optimizes:
+
+  1. **Recommendation task** (predict user ↔ track interaction) using your co-occurrence features + track/artist embeddings,
+  2. **KGE task** (true vs. corrupted triples).
+* Bridge both with a **Cross & Compression Unit** to share interaction features between the rec module and KG module. Expose depth `L`/`H` as hyperparams.
+* CLI:
+
+  ```bash
+  python -m sgr.train.joint \
+    --rec-dim 128 --kge-dim 128 --cross-depth 1 --epochs 200 \
+    --lr-rec 2e-5 --lr-kge 2e-5 --l2 2e-5 --kge-interval 64
+  ```
+* Loss = `L_rec + L_kge + λ‖w‖²`, with **multi-activation fusion** in the KGE score and **multi-prediction fusion** (dot-product then sigmoid/tanh/softsign) in the rec head, following the paper’s recipe.
+
+### 4) Evaluation Suite (AUC/ACC + Ablations)
+
+* Create a benchmark split (e.g., 60/20/20) over user–track interactions; report **AUC** and **Accuracy**.
+* Add **ablation flags**:
+
+  * `--no-cross` (remove Cross\&Compression),
+  * `--single-activation` (disable multi-activation scoring),
+  * `--single-pred` (disable multi-prediction head),
+  * `--no-kge` (rec only).
+* CLI:
+
+  ```bash
+  python -m sgr.eval.run --metrics auc,acc
+  python -m sgr.eval.ablate --no-cross
+  ```
+* Document gains vs. baselines similar to the paper’s tables (AUC/ACC deltas).
+
+### 5) Reproducible KG Build Pipeline
+
+* Add a **KG build DAG** mirroring the paper’s stages:
+
+  1. **Acquisition** (SoundCloud metadata),
+  2. **Extraction** (entity/rel/tag parsing),
+  3. **Fusion** (entity alignment + dedupe),
+  4. **Triples** (graphization),
+  5. **Cleaning** (QC, missing/invalid fix).
+* Surface a single command:
+
+  ```bash
+  make build_kg   # runs ingest → clean → fuse → triples → validate
+  ```
+* Include a `KG_VALIDATION.md` with sanity checks (degree dist., top relations, duplicate rate).
+
+### 6) API & Explainability Hooks
+
+* Extend `unveil.py` to **explain recommendations** with:
+
+  * Paths in the KG (e.g., `TrackA → in_playlist → P → in_playlist → TrackB`),
+  * Contribution from **co-occurrence vs. KGE proximity vs. tag overlap**,
+  * Confidence from the multi-prediction head.
+* Provide an `/explanations` endpoint that returns **evidence triples** and normalized contributions.
+
+### 7) Dataset Notes & Ethics
+
+* The paper did **not** publish its KG; it shared **methodology** and used public datasets for evaluation. Follow that precedent—ship scripts/configs to **rebuild** the graph from public SoundCloud metadata you’re permitted to use, and clearly document rate limits and ToS.
+
+### 8) What to Commit in This Repo
+
+* `src/sgr/kge/` (TransE/H/R + trainers + negative sampling + multi-activation scoring).
+* `src/sgr/model/cross_compress.py` (Cross & Compression unit).
+* `src/sgr/train/joint.py` (multi-task loop, alternating updates; `--kge-interval`).
+* `src/sgr/eval/` (AUC/ACC, ablations, hyperparam sweeps).
+* `docs/MMSS_MKR_README.md` (math, symbols, and learning schedule overview; small diagrams of Fig.-style blocks).
+
+---
+
+### ✨ Deliverables Checklist
+
+* [ ] KG triples export + validation report
+* [ ] TransE baseline + embeddings artifact
+* [ ] Cross\&Compression module integrated
+* [ ] Joint training with multi-prediction & multi-activation scoring
+* [ ] AUC/ACC metrics + ablation report
+* [ ] `/explanations` API returning evidence paths
+
+These steps keep SoundGraph’s transparency while adopting the **KG + multi-task learning** techniques that improved accuracy in the paper—giving you both **better recs** and **auditable reasons** for each suggestion.
