@@ -1,3 +1,7 @@
+-- === EXTENSIONS =============================================================
+CREATE EXTENSION IF NOT EXISTS "btree_gin";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+
 -- === ENTITIES ===============================================================
 
 CREATE TABLE IF NOT EXISTS artists (
@@ -171,6 +175,5 @@ GROUP BY 1,2;
 CREATE INDEX IF NOT EXISTS idx_cooccur_a ON track_cooccurrence(track_id_a, weight DESC);
 
 -- === OPTIONAL: pgvector setup ===============================================
--- CREATE EXTENSION IF NOT EXISTS vector;
 -- CREATE INDEX IF NOT EXISTS idx_track_emb_ivf   ON tracks    USING ivfflat (emb vector_cosine) WITH (lists=100);
 -- CREATE INDEX IF NOT EXISTS idx_pl_emb_ivf      ON playlists USING ivfflat (emb vector_cosine) WITH (lists=100);

@@ -63,7 +63,8 @@ def clean_file(in_path: Path) -> pd.DataFrame:
                     title=(obj.get("title") or "").strip(),
                     description=(obj.get("description") or "")[:2000],
                     tag_list=obj.get("tag_list") or "",
-                    tags=",".join(parse_tags(obj.get("tag_list") or "")),
+                    # CHANGED: Return list for TEXT[] mapping
+                    tags=list(parse_tags(obj.get("tag_list") or "")),
                     genre=(obj.get("genre") or "").lower(),
                     user_id=user.get("id"),
                     username=user.get("username"),
