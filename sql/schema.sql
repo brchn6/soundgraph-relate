@@ -150,7 +150,10 @@ CREATE INDEX IF NOT EXISTS idx_related_src_score ON related_tracks(src_track_id,
 -- === CO-OCCURRENCE VIEW =====================================================
 
 -- Weighted co-occurrence: inverse playlist size down-weights huge playlists
-CREATE MATERIALIZED VIEW IF NOT EXISTS track_cooccurrence AS
+-- Use DROP + CREATE to avoid compatibility issues with older PG versions that
+-- may not support CREATE MATERIALIZED VIEW IF NOT EXISTS
+DROP MATERIALIZED VIEW IF EXISTS track_cooccurrence;
+CREATE MATERIALIZED VIEW track_cooccurrence AS
 WITH pl_sizes AS (
   SELECT playlist_id, COUNT(*)::REAL AS n
   FROM playlist_tracks
@@ -164,7 +167,8 @@ pairs AS (
   JOIN playlist_tracks b
     ON a.playlist_id = b.playlist_id
    AND a.track_id <> b.track_id
-  JOIN pl_sizes ps USING (playlist_id)
+  JOIN pl_sizes ps
+    ON a.playlist_id = ps.playlist_id   
 )
 SELECT track_id_a, track_id_b,
        COUNT(*)        AS together,
