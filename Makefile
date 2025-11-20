@@ -1,4 +1,4 @@
-.PHONY: env deps ingest clean db up load fmt refresh_and_request test doctor schema_extras cooccur pipeline_url playlists_clean playlists_load unveil
+.PHONY: env deps ingest clean db up load fmt refresh_and_request test doctor schema_extras cooccur pipeline_url playlists_clean playlists_load unveil build_graph
 
 # Create and activate Conda environment, install dependencies
 env:
@@ -8,6 +8,7 @@ env:
 # Install dependencies from requirements.txt
 deps:
 	pip install -r requirements.txt
+	pip install networkx matplotlib  # For personal graph functionality
 	python -m ipykernel install --user --name sgr --display-name "Python (sgr)" || true
 	pip install -e . || true
 
@@ -89,4 +90,20 @@ export_corpus:
 	python scripts/export_training_corpus.py
 export_pairs:
 	python scripts/export_pairs.py
-	
+
+# ===== NEW: User-Driven Architecture =====
+
+# Build a personal graph from a seed track (new architecture)
+build_graph:
+	@if [ -z "$(TRACK_URL)" ]; then echo "Usage: make build_graph TRACK_URL=..."; exit 1; fi
+	TRACK_URL=$(TRACK_URL) python scripts/build_personal_graph.py
+
+# Build with custom depth
+build_graph_deep:
+	@if [ -z "$(TRACK_URL)" ]; then echo "Usage: make build_graph_deep TRACK_URL=..."; exit 1; fi
+	TRACK_URL=$(TRACK_URL) DEPTH=2 MAX_TRACKS=1000 python scripts/build_personal_graph.py
+
+# Build and visualize
+build_graph_viz:
+	@if [ -z "$(TRACK_URL)" ]; then echo "Usage: make build_graph_viz TRACK_URL=..."; exit 1; fi
+	TRACK_URL=$(TRACK_URL) VISUALIZE=true python scripts/build_personal_graph.py

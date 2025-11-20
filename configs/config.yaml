@@ -17,3 +17,13 @@ db:
   user_env: "PGUSER"
   pwd_env: "PGPASSWORD"
   db_env: "PGDATABASE"
+cache:
+  default_path: "data/cache/tracks.db"
+  max_age_hours: 24
+  max_playlists_per_artist: 20
+  max_tracks_per_playlist: 100
+  min_playback_count: 1000
+graph:
+  default_depth: 1
+  default_max_tracks: 500
+  output_dir: "data/graphs"

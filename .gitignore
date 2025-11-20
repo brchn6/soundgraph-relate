@@ -51,6 +51,8 @@ Thumbs.db
 
 # Temporary data files
 data/raw/*.jsonl
+data/cache/
+data/graphs/
 
 # Miscellaneous files
 *.bak
