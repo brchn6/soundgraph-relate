@@ -1,4 +1,17 @@
 # scripts/ingest_sample.py
+"""
+LEGACY SCRIPT - Bulk genre-based data collection.
+
+For most use cases, consider using the new Personal Graph Mode instead:
+    make build_graph TRACK_URL="https://soundcloud.com/artist/track"
+
+This script is maintained for backwards compatibility and large-scale
+bulk data collection scenarios. For on-demand, user-driven exploration,
+see scripts/build_personal_graph.py
+
+Usage:
+    SAMPLE_QUERY="lofi" python scripts/ingest_sample.py
+"""
 from __future__ import annotations
 import os, json, time, urllib.parse
 from pathlib import Path
