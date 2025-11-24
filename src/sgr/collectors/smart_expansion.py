@@ -3,6 +3,12 @@ Smart expansion logic for building personal music graphs.
 
 This module implements intelligent strategies for expanding a music graph
 from a seed track, using heuristics to prioritize interesting connections.
+
+Supports multi-layer expansion:
+- Layer 1: Track-to-Track via playlist co-occurrence
+- Layer 2: User-to-Track via likes/reposts (optional)
+- Layer 3: User-to-User via taste similarity (optional)
+- Layer 4: Artist-to-Artist via collaborations (optional)
 """
 
 from __future__ import annotations
@@ -20,10 +26,12 @@ class SmartExpander:
     Smart expansion engine for building personal music graphs.
     
     Starting from a seed track, this expander:
-    1. Fetches the artist's playlists
+    1. Fetches the artist's playlists (Layer 1)
     2. Extracts tracks from those playlists
     3. Builds co-occurrence relationships
-    4. Optionally expands to related artists
+    4. Optionally collects user engagements (Layer 2)
+    5. Optionally calculates user similarities (Layer 3)
+    6. Optionally detects artist relationships (Layer 4)
     
     Uses caching to minimize API calls and supports configurable depth limits.
     """
@@ -31,7 +39,8 @@ class SmartExpander:
     def __init__(self, sc_client: SCClient, cache: TrackCache, 
                  max_playlists_per_artist: int = 20,
                  max_tracks_per_playlist: int = 100,
-                 min_playback_count: int = 1000):
+                 min_playback_count: int = 1000,
+                 multi_layer_config: Optional[Dict[str, Any]] = None):
         """
         Initialize the smart expander.
         
@@ -41,12 +50,17 @@ class SmartExpander:
             max_playlists_per_artist: Max playlists to fetch per artist
             max_tracks_per_playlist: Max tracks to consider per playlist
             min_playback_count: Min playback count for tracks to include
+            multi_layer_config: Configuration for multi-layer collection (optional)
         """
         self.sc = sc_client
         self.cache = cache
         self.max_playlists_per_artist = max_playlists_per_artist
         self.max_tracks_per_playlist = max_tracks_per_playlist
         self.min_playback_count = min_playback_count
+        
+        # Multi-layer support
+        self.multi_layer_config = multi_layer_config or {}
+        self.multi_layer_enabled = self.multi_layer_config.get("enabled_layers", {})
         
     def expand_from_track(self, track_id: int, depth: int = 1, 
                          max_tracks: int = 500) -> Dict[str, Any]:
@@ -117,6 +131,15 @@ class SmartExpander:
                         if rel_track_id not in visited_tracks:
                             queue.append((rel_track_id, current_depth + 1))
                             visited_tracks.add(rel_track_id)
+        
+        # Multi-layer collection (if enabled)
+        if self.multi_layer_enabled:
+            logger.info("Starting multi-layer relationship collection...")
+            from sgr.collectors.multi_layer_collector import MultiLayerCollector
+            
+            ml_collector = MultiLayerCollector(self.sc, self.cache, self.multi_layer_config)
+            ml_results = ml_collector.collect_multi_layer_relationships(list(results["tracks_visited"]))
+            results["multi_layer"] = ml_results
         
         # Convert sets to counts for JSON serialization
         results["artists_visited"] = len(results["artists_visited"])

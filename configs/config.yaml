@@ -27,3 +27,50 @@ graph:
   default_depth: 1
   default_max_tracks: 500
   output_dir: "data/graphs"
+
+# Multi-layer relationship configuration
+multi_layer:
+  # Enable/disable specific relationship layers
+  enabled_layers:
+    layer1_playlist_cooccurrence: true   # Track-to-Track via playlist co-occurrence
+    layer2_user_engagement: true         # User-to-Track via likes/reposts/plays
+    layer3_user_similarity: true         # User-to-User via taste patterns
+    layer4_artist_collaboration: true    # Artist-to-Artist via collaborations
+  
+  # Layer 1: Track co-occurrence (existing)
+  layer1:
+    max_playlists_per_artist: 20
+    max_tracks_per_playlist: 100
+    min_playback_count: 1000
+    depth: 1
+  
+  # Layer 2: User engagement
+  layer2:
+    enabled: true
+    max_likers_per_track: 50           # Max users who liked a track to process
+    max_tracks_per_user: 100           # Max liked tracks to fetch per user
+    min_likes_threshold: 10            # Min likes for a track to process
+    collect_reposts: true              # Collect repost data
+    collect_plays: false               # Collect play counts (if available)
+    depth: 1                           # How many hops to follow user engagements
+  
+  # Layer 3: User similarity
+  layer3:
+    enabled: true
+    min_common_tracks: 3               # Min shared tracks for similarity
+    min_similarity_score: 0.1          # Min Jaccard score to store
+    max_similar_users: 50              # Max similar users to compute per user
+    similarity_metrics:
+      - jaccard_likes                  # Jaccard index on liked tracks
+      # - cosine_taste                 # Cosine similarity (future)
+    collect_follows: true              # Collect user follow relationships
+  
+  # Layer 4: Artist relationships
+  layer4:
+    enabled: true
+    min_collaboration_evidence: 2      # Min evidence for collaboration
+    detect_collaborations: true        # Detect track collaborations
+    detect_co_follows: true            # Detect artists followed by same users
+    detect_co_library: true            # Detect artists in same user libraries
+    max_related_artists: 30            # Max related artists to compute per artist
+
