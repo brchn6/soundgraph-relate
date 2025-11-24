@@ -191,7 +191,6 @@ class SmartExpander:
             # Cache playlist tracks
             valid_tracks = [t for t in tracks if t and t.get("id")][:self.max_tracks_per_playlist]
             self.cache.cache_playlist_tracks(playlist_id, valid_tracks)
-            
             # Build co-occurrence relationships
             for i, track_a in enumerate(valid_tracks):
                 track_a_id = track_a.get("id")
@@ -200,9 +199,16 @@ class SmartExpander:
                 
                 # Filter by playback count if specified
                 if self.min_playback_count > 0:
-                    playback = track_a.get("playback_count", 0)
-                    if playback < self.min_playback_count:
-                        continue
+                    playback = track_a.get("playback_count")
+                    # Handle None, string, or other unexpected types
+                    if playback is None:
+                        continue  # Skip tracks with no playback count
+                    try:
+                        playback = int(playback)  # Ensure it's an integer
+                        if playback < self.min_playback_count:
+                            continue
+                    except (TypeError, ValueError):
+                        continue  # Skip if we can't convert to int
                 
                 stats["new_tracks"] += 1
                 
