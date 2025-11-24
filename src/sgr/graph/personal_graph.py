@@ -285,19 +285,6 @@ class PersonalGraph:
     
     def get_neighbors(self, track_id: int, limit: int = 10, layer: Optional[int] = None) -> List[Dict[str, Any]]:
         """
-        Get neighboring tracks in the graph.
-        
-        Args:
-            track_id: The track ID
-            limit: Maximum neighbors to return
-            
-        Returns:
-            List of neighbor track dicts with edge weights
-        """
-        if track_id not in self.graph:
-            return []
-        
-        """
         Get neighboring nodes in the graph.
         
         Args:
@@ -507,11 +494,22 @@ class PersonalGraph:
             "avg_degree": sum(degrees) / len(degrees) if degrees else 0.0,
             "max_degree": max(degrees) if degrees else 0,
             "min_degree": min(degrees) if degrees else 0,
-            "connected_components": nx.number_weakly_connected_components(self.graph),
             "track_nodes": len(self._track_nodes),
             "user_nodes": len(self._user_nodes),
             "artist_nodes": len(self._artist_nodes)
         }
+        
+        # Calculate connected components (skip for very large graphs)
+        num_nodes = self.graph.number_of_nodes()
+        if num_nodes < 10000:
+            try:
+                stats["connected_components"] = nx.number_weakly_connected_components(self.graph)
+            except Exception as e:
+                logger.warning(f"Could not calculate connected components: {e}")
+                stats["connected_components"] = None
+        else:
+            # Skip for large graphs to avoid performance issues
+            stats["connected_components"] = None
         
         # Add layer-specific stats
         if self.enable_multi_layer:

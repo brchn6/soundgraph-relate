@@ -25,7 +25,9 @@ class Layer2Collector:
     Collects user-to-track relationships via:
     - Likes (track favoriters)
     - Reposts
-    - Plays (if available)
+    
+    Note: Play count data collection is planned for future implementation
+    when SoundCloud API provides this endpoint.
     """
     
     def __init__(self, sc_client: SCClient, cache: TrackCache, config: Dict[str, Any]):
