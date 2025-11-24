@@ -2,6 +2,39 @@
 
 **SoundGraph** is a data-driven music discovery engine that builds knowledge graphs from SoundCloud metadata to uncover hidden relationships between tracks, artists, and users.
 
+## 🚀 **New: User-Driven Architecture**
+
+SoundGraph now supports **two modes of operation**:
+
+### 1️⃣ **Personal Graph Mode (NEW - Recommended)** 🎯
+Build your own music discovery graph on-demand without needing PostgreSQL:
+- Start from any SoundCloud track
+- Expand through related tracks via playlists
+- Cache everything locally in SQLite
+- Get instant recommendations
+- Visualize your personal music network
+
+**Quick Start:**
+```bash
+# Build a personal graph from a track
+make build_graph TRACK_URL="https://soundcloud.com/artist/track"
+
+# Deeper exploration
+make build_graph_deep TRACK_URL="https://soundcloud.com/artist/track"
+
+# With visualization
+make build_graph_viz TRACK_URL="https://soundcloud.com/artist/track"
+```
+
+### 2️⃣ **Bulk Collection Mode (Legacy)** 📊
+Traditional workflow for building large-scale databases:
+- Bulk genre-based collection
+- PostgreSQL storage
+- Materialized views for co-occurrence
+- Production-ready for large datasets
+
+---
+
 ## 🎯 **What Does SoundGraph Do?**
 
 SoundGraph goes **beyond SoundCloud's built-in recommendations** by creating a comprehensive knowledge graph that reveals:
@@ -40,7 +73,105 @@ Instead of just analyzing individual track features, SoundGraph looks at **behav
 
 ---
 
-## 🚀 **Quick Start**
+## 🚀 **Quick Start - Personal Graph Mode** (Recommended)
+
+The easiest way to start exploring music relationships:
+
+### **Prerequisites**
+- Python 3.11+
+- SoundCloud API access (OAuth token)
+- No database required! ✨
+
+### **Installation**
+```bash
+git clone https://github.com/your-username/soundgraph.git
+cd soundgraph
+
+# Setup environment
+conda create -y -n sgr python=3.11
+conda activate sgr
+pip install -r requirements.txt
+pip install -e .
+```
+
+### **Configuration**
+Create `.env` file:
+```env
+# SoundCloud API (only these are required for personal graphs)
+SOUNDCLOUD_ACCESS_TOKEN=your_oauth_token_here
+SOUNDCLOUD_CLIENT_ID=your_client_id_here
+```
+
+### **Build Your First Personal Graph** 🎵
+
+```bash
+# 1. Find a track you like on SoundCloud
+# Example: https://soundcloud.com/chillhop/floating-away
+
+# 2. Build a personal graph from it
+make build_graph TRACK_URL="https://soundcloud.com/chillhop/floating-away"
+
+# This will:
+# ✅ Fetch the track and artist info
+# ✅ Explore the artist's playlists
+# ✅ Find related tracks via co-occurrence
+# ✅ Cache everything locally (data/cache/tracks.db)
+# ✅ Build a NetworkX graph
+# ✅ Give you recommendations!
+```
+
+### **What You Get** 📊
+
+After running the command, you'll see:
+- **Track Statistics**: How many tracks were collected
+- **Playlist Coverage**: How many playlists were analyzed
+- **Recommendations**: Top 5 related tracks based on graph structure
+- **Neighbors**: Direct relationships to your seed track
+- **Graph Export**: JSON file for further analysis
+
+### **Advanced Usage**
+
+```bash
+# Deeper exploration (2 hops instead of 1)
+make build_graph_deep TRACK_URL="https://soundcloud.com/artist/track"
+
+# With visualization
+make build_graph_viz TRACK_URL="https://soundcloud.com/artist/track"
+
+# Custom parameters
+TRACK_URL="https://soundcloud.com/artist/track" \
+DEPTH=3 \
+MAX_TRACKS=2000 \
+VISUALIZE=true \
+python scripts/build_personal_graph.py
+```
+
+### **Output Files**
+
+All outputs are stored locally:
+```
+data/
+├── cache/
+│   └── tracks.db          # SQLite cache (reusable across sessions)
+└── graphs/
+    ├── graph_xxx.json     # NetworkX graph export
+    └── graph_xxx.png      # Visualization (if VISUALIZE=true)
+```
+
+### **Key Features** ✨
+
+- **🚀 No Database Setup**: Just API token and you're ready
+- **💾 Smart Caching**: Re-running doesn't re-fetch data
+- **🎯 Personalized**: Each user builds their own graph
+- **📈 Scalable**: Start small, expand as needed
+- **🔍 Transparent**: See exactly why tracks are related
+- **🎨 Visual**: Export graphs for visualization
+
+---
+
+## 🚀 **Quick Start - Bulk Collection Mode** (For Large Datasets)
+
+For production use cases requiring PostgreSQL and large-scale data collection:
 
 ### **Prerequisites**
 - Python 3.11+
@@ -270,6 +401,103 @@ make pipeline TRACK_URL="https://soundcloud.com/ambient-artist/floating-dreams"
 ---
 
 ## 📊 **Project Architecture**
+
+### **Personal Graph Mode (New)**
+```
+User Input (Track URL)
+    ↓
+1. Resolve Track → SoundCloud API
+    ↓
+2. Smart Expansion
+    ├─ Fetch artist's playlists
+    ├─ Extract tracks from playlists
+    ├─ Build co-occurrence relationships
+    └─ BFS expansion (configurable depth)
+    ↓
+3. Local Cache (SQLite)
+    ├─ Tracks table
+    ├─ Playlists table
+    ├─ Related tracks table
+    └─ Fast retrieval
+    ↓
+4. Build Personal Graph (NetworkX)
+    ├─ Track nodes
+    ├─ Weighted edges
+    ├─ Graph algorithms
+    └─ Recommendations
+    ↓
+5. Export & Visualize
+    ├─ JSON export
+    ├─ PNG visualization
+    └─ Query interface
+```
+
+### **Bulk Collection Mode (Legacy)**
+```
+Search Query
+    ↓
+Bulk Collection → Raw JSONL
+    ↓
+Clean & Normalize → Parquet
+    ↓
+Load to PostgreSQL
+    ↓
+Materialized Views (co-occurrence)
+    ↓
+Query & Analysis
+```
+
+### **File Structure**
+```
+soundgraph/
+├── scripts/
+│   ├── build_personal_graph.py   # NEW: User-facing personal graph builder
+│   ├── ingest_sample.py          # Legacy: Bulk collection
+│   ├── resolve_and_crawl.py      # Legacy: Deep crawl
+│   └── unveil.py                 # Legacy: Query tool
+├── src/sgr/
+│   ├── cache/                    # NEW: SQLite caching
+│   │   ├── __init__.py
+│   │   └── track_cache.py
+│   ├── collectors/               # NEW: Smart expansion
+│   │   ├── __init__.py
+│   │   └── smart_expansion.py
+│   ├── graph/                    # NEW: NetworkX graphs
+│   │   ├── __init__.py
+│   │   └── personal_graph.py
+│   ├── clean/                    # Legacy: Data normalization
+│   ├── db/                       # Legacy: PostgreSQL ops
+│   └── io/                       # Shared: SoundCloud client
+├── data/
+│   ├── cache/                    # NEW: SQLite databases
+│   ├── graphs/                   # NEW: Exported graphs
+│   ├── raw/                      # Legacy: Raw JSON
+│   └── staging/                  # Legacy: Parquet files
+└── tests/
+    └── test_user_driven_architecture.py  # NEW: Tests
+```
+
+---
+
+## 🔀 **Choosing the Right Mode**
+
+| Feature | Personal Graph Mode | Bulk Collection Mode |
+|---------|-------------------|---------------------|
+| **Database Required** | ❌ No (SQLite only) | ✅ Yes (PostgreSQL) |
+| **Setup Complexity** | 🟢 Low | 🟡 Medium |
+| **Collection Speed** | 🟢 Fast (on-demand) | 🔴 Slow (bulk) |
+| **Data Volume** | Small-Medium (100s-1000s tracks) | Large (10,000s+ tracks) |
+| **Use Case** | Personal exploration, quick iteration | Production, large-scale analysis |
+| **Recommendations** | ✅ Graph-based | ✅ SQL-based |
+| **Caching** | ✅ Automatic (SQLite) | ❌ Manual |
+| **Visualization** | ✅ Built-in | ⚠️ External tools |
+| **Best For** | Individual users, experimentation | Researchers, production systems |
+
+**Recommendation**: Start with **Personal Graph Mode** for exploration, then move to **Bulk Collection Mode** if you need large-scale production data.
+
+---
+
+## 📊 **Original Project Architecture (Legacy)**
 
 ```
 soundgraph/
