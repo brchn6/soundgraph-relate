@@ -186,7 +186,16 @@ class DeepHarvestEngine:
         logger.info(f"Found {len(reposters)} users who reposted this track")
         
         # Combine and deduplicate
-        all_users = {u['id']: u for u in likers + reposters if u.get('id')}
+        # Handle mixed data types (sometimes API returns strings instead of dicts)
+        all_users = {}
+        for u in likers + reposters:
+            if isinstance(u, dict) and u.get('id'):
+                all_users[u['id']] = u
+            elif isinstance(u, str):
+                # Skip string IDs - we need full user objects
+                logger.debug(f"Skipping string user ID: {u}")
+                continue
+        
         logger.info(f"Total unique users: {len(all_users)}")
         
         # For each user, harvest their entire library
@@ -211,7 +220,7 @@ class DeepHarvestEngine:
             
             # Cache all tracks from user's library
             for liked_track in user_library:
-                if liked_track.get('id'):
+                if isinstance(liked_track, dict) and liked_track.get('id'):
                     self._cache_track_data(liked_track)
                     # Record engagement
                     self.cache.add_user_engagement(
@@ -246,7 +255,7 @@ class DeepHarvestEngine:
             )
             
             for playlist in artist_playlists:
-                if playlist.get('id'):
+                if isinstance(playlist, dict) and playlist.get('id'):
                     playlists_found.add(playlist['id'])
                     self._harvest_playlist_tracks(playlist)
         
@@ -284,7 +293,7 @@ class DeepHarvestEngine:
         # Filter to only tracks by this artist
         confirmed_tracks = [
             t for t in artist_tracks 
-            if t.get('user', {}).get('id') == artist_id
+            if isinstance(t, dict) and t.get('user', {}).get('id') == artist_id
         ]
         
         logger.info(f"Found {len(confirmed_tracks)} tracks by this artist")
@@ -317,12 +326,13 @@ class DeepHarvestEngine:
             )
             
             for track in search_results:
-                track_title = track.get('title', '')
-                similarity = self._string_similarity(title, track_title)
-                
-                if similarity >= self.name_similarity_threshold:
-                    similar_tracks.append(track)
-                    self._cache_track_data(track)
+                if isinstance(track, dict):
+                    track_title = track.get('title', '')
+                    similarity = self._string_similarity(title, track_title)
+                    
+                    if similarity >= self.name_similarity_threshold:
+                        similar_tracks.append(track)
+                        self._cache_track_data(track)
             
             time.sleep(self.request_delay)
         
@@ -386,7 +396,7 @@ class DeepHarvestEngine:
             
             for track in label_catalog:
                 # Verify it's actually from this label
-                if label.lower() in (track.get('label_name', '') or '').lower():
+                if isinstance(track, dict) and label.lower() in (track.get('label_name', '') or '').lower():
                     self._cache_track_data(track)
             
             time.sleep(self.request_delay)
@@ -440,7 +450,8 @@ class DeepHarvestEngine:
             )
             
             for track in entity_tracks:
-                self._cache_track_data(track)
+                if isinstance(track, dict):
+                    self._cache_track_data(track)
             
             time.sleep(self.request_delay)
         
@@ -484,11 +495,13 @@ class DeepHarvestEngine:
         tracks = playlist_data.get('tracks', [])
         if tracks:
             for track in tracks:
-                if track and track.get('id'):
+                if isinstance(track, dict) and track.get('id'):
                     self._cache_track_data(track)
             
-            # Cache playlist-track relationships
-            self.cache.cache_playlist_tracks(playlist_id, tracks)
+            # Cache playlist-track relationships (filter to valid tracks)
+            valid_tracks = [t for t in tracks if isinstance(t, dict) and t.get('id')]
+            if valid_tracks:
+                self.cache.cache_playlist_tracks(playlist_id, valid_tracks)
     
     def _fetch_all_paginated(self, fetch_func, max_results: int = 1000) -> List[Dict[str, Any]]:
         """
