@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 from loguru import logger
+import contextlib
 
 
 class TrackCache:
@@ -199,6 +200,17 @@ class TrackCache:
         
         self.conn.commit()
     
+    @contextlib.contextmanager
+    def _transaction(self):
+        """Context manager for database transactions."""
+        cursor = self.conn.cursor()
+        try:
+            yield cursor
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            raise
+    
     def cache_track(self, track_data: Dict[str, Any]) -> int:
         """
         Cache a track's metadata.
@@ -225,30 +237,82 @@ class TrackCache:
         else:
             tags_json = json.dumps([])
         
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            INSERT OR REPLACE INTO tracks (
-                track_id, title, artist_id, artist_name, genre, tags,
-                duration_ms, playback_count, like_count, permalink_url,
-                raw_json, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        """, (
-            track_id,
-            track_data.get("title", "Untitled"),
-            artist_id,
-            artist_name,
-            track_data.get("genre"),
-            tags_json,
-            track_data.get("duration"),
-            track_data.get("playback_count", 0),
-            track_data.get("likes_count", 0) or track_data.get("favoritings_count", 0),
-            track_data.get("permalink_url"),
-            json.dumps(track_data)
-        ))
-        self.conn.commit()
+        with self._transaction() as cursor:
+            cursor.execute("""
+                INSERT OR REPLACE INTO tracks (
+                    track_id, title, artist_id, artist_name, genre, tags,
+                    duration_ms, playback_count, like_count, permalink_url,
+                    raw_json, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (
+                track_id,
+                track_data.get("title", "Untitled"),
+                artist_id,
+                artist_name,
+                track_data.get("genre"),
+                tags_json,
+                track_data.get("duration"),
+                track_data.get("playback_count", 0),
+                track_data.get("likes_count", 0) or track_data.get("favoritings_count", 0),
+                track_data.get("permalink_url"),
+                json.dumps(track_data)
+            ))
         
         logger.debug(f"Cached track {track_id}: {track_data.get('title')}")
         return track_id
+    
+    def cache_tracks_batch(self, tracks_data: List[Dict[str, Any]]) -> List[int]:
+        """
+        Cache multiple tracks in a single transaction for better performance.
+        
+        Args:
+            tracks_data: List of track data dicts
+            
+        Returns:
+            List of cached track IDs
+        """
+        track_ids = []
+        with self._transaction() as cursor:
+            for track_data in tracks_data:
+                track_id = track_data.get("id")
+                if not track_id:
+                    continue
+                    
+                user = track_data.get("user") or {}
+                artist_id = user.get("id")
+                artist_name = user.get("username", "Unknown")
+                
+                tags = track_data.get("tag_list", "")
+                if isinstance(tags, list):
+                    tags_json = json.dumps(tags)
+                elif isinstance(tags, str):
+                    tags_json = json.dumps([t.strip() for t in tags.split() if t.strip()])
+                else:
+                    tags_json = json.dumps([])
+                
+                cursor.execute("""
+                    INSERT OR REPLACE INTO tracks (
+                        track_id, title, artist_id, artist_name, genre, tags,
+                        duration_ms, playback_count, like_count, permalink_url,
+                        raw_json, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, (
+                    track_id,
+                    track_data.get("title", "Untitled"),
+                    artist_id,
+                    artist_name,
+                    track_data.get("genre"),
+                    tags_json,
+                    track_data.get("duration"),
+                    track_data.get("playback_count", 0),
+                    track_data.get("likes_count", 0) or track_data.get("favoritings_count", 0),
+                    track_data.get("permalink_url"),
+                    json.dumps(track_data)
+                ))
+                track_ids.append(track_id)
+        
+        logger.debug(f"Cached {len(track_ids)} tracks in batch")
+        return track_ids
     
     def get_track(self, track_id: int) -> Optional[Dict[str, Any]]:
         """
@@ -280,19 +344,18 @@ class TrackCache:
         if not user_id:
             raise ValueError("User data must contain 'id' field")
         
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            INSERT OR REPLACE INTO users (
-                user_id, username, permalink_url, followers_count, raw_json
-            ) VALUES (?, ?, ?, ?, ?)
-        """, (
-            user_id,
-            user_data.get("username", "Unknown"),
-            user_data.get("permalink_url"),
-            user_data.get("followers_count", 0),
-            json.dumps(user_data)
-        ))
-        self.conn.commit()
+        with self._transaction() as cursor:
+            cursor.execute("""
+                INSERT OR REPLACE INTO users (
+                    user_id, username, permalink_url, followers_count, raw_json
+                ) VALUES (?, ?, ?, ?, ?)
+            """, (
+                user_id,
+                user_data.get("username", "Unknown"),
+                user_data.get("permalink_url"),
+                user_data.get("followers_count", 0),
+                json.dumps(user_data)
+            ))
         return user_id
     
     def cache_playlist(self, playlist_data: Dict[str, Any]) -> int:
@@ -304,20 +367,19 @@ class TrackCache:
         user = playlist_data.get("user") or {}
         creator_id = user.get("id")
         
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            INSERT OR REPLACE INTO playlists (
-                playlist_id, title, creator_user_id, track_count, permalink_url, raw_json
-            ) VALUES (?, ?, ?, ?, ?, ?)
-        """, (
-            playlist_id,
-            playlist_data.get("title", "Untitled"),
-            creator_id,
-            playlist_data.get("track_count", 0),
-            playlist_data.get("permalink_url"),
-            json.dumps(playlist_data)
-        ))
-        self.conn.commit()
+        with self._transaction() as cursor:
+            cursor.execute("""
+                INSERT OR REPLACE INTO playlists (
+                    playlist_id, title, creator_user_id, track_count, permalink_url, raw_json
+                ) VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                playlist_id,
+                playlist_data.get("title", "Untitled"),
+                creator_id,
+                playlist_data.get("track_count", 0),
+                playlist_data.get("permalink_url"),
+                json.dumps(playlist_data)
+            ))
         return playlist_id
     
     def cache_playlist_tracks(self, playlist_id: int, tracks: List[Dict[str, Any]]):
@@ -328,23 +390,21 @@ class TrackCache:
             playlist_id: The playlist ID
             tracks: List of track data dicts (must have 'id' field)
         """
-        cursor = self.conn.cursor()
-        for position, track in enumerate(tracks):
-            track_id = track.get("id")
-            if not track_id:
-                continue
+        with self._transaction() as cursor:
+            # Cache all tracks first
+            self.cache_tracks_batch(tracks)
             
-            # Cache the track itself
-            self.cache_track(track)
-            
-            # Link it to the playlist
-            cursor.execute("""
-                INSERT OR REPLACE INTO playlist_tracks (
-                    playlist_id, track_id, position
-                ) VALUES (?, ?, ?)
-            """, (playlist_id, track_id, position))
-        
-        self.conn.commit()
+            # Then link them to the playlist
+            for position, track in enumerate(tracks):
+                track_id = track.get("id")
+                if not track_id:
+                    continue
+                
+                cursor.execute("""
+                    INSERT OR REPLACE INTO playlist_tracks (
+                        playlist_id, track_id, position
+                    ) VALUES (?, ?, ?)
+                """, (playlist_id, track_id, position))
     
     def add_related_track(self, src_track_id: int, dst_track_id: int, 
                          relation_type: str = "co_playlist", weight: float = 1.0):
@@ -357,13 +417,27 @@ class TrackCache:
             relation_type: Type of relationship (co_playlist, similar, artist, etc.)
             weight: Strength of the relationship
         """
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            INSERT OR REPLACE INTO related_tracks (
-                src_track_id, dst_track_id, relation_type, weight
-            ) VALUES (?, ?, ?, ?)
-        """, (src_track_id, dst_track_id, relation_type, weight))
-        self.conn.commit()
+        with self._transaction() as cursor:
+            cursor.execute("""
+                INSERT OR REPLACE INTO related_tracks (
+                    src_track_id, dst_track_id, relation_type, weight
+                ) VALUES (?, ?, ?, ?)
+            """, (src_track_id, dst_track_id, relation_type, weight))
+    
+    def add_related_tracks_batch(self, relationships: List[Tuple[int, int, str, float]]):
+        """
+        Add multiple track relationships in batch.
+        
+        Args:
+            relationships: List of (src_track_id, dst_track_id, relation_type, weight) tuples
+        """
+        with self._transaction() as cursor:
+            for src_id, dst_id, rel_type, weight in relationships:
+                cursor.execute("""
+                    INSERT OR REPLACE INTO related_tracks (
+                        src_track_id, dst_track_id, relation_type, weight
+                    ) VALUES (?, ?, ?, ?)
+                """, (src_id, dst_id, rel_type, weight))
     
     def get_related_tracks(self, track_id: int, relation_type: Optional[str] = None,
                           limit: int = 50) -> List[Dict[str, Any]]:

@@ -17,6 +17,7 @@ from typing import Dict, Any, List, Optional, Set, Tuple
 from pathlib import Path
 import json
 from loguru import logger
+import collections
 
 from sgr.cache.track_cache import TrackCache
 
@@ -46,14 +47,15 @@ class PersonalGraph:
             enable_multi_layer: Enable multi-layer relationship loading
         """
         self.cache = cache
-        self.graph = nx.MultiDiGraph()  # Changed to MultiDiGraph to support multiple edge types
+        self.graph = nx.MultiDiGraph()
         self._track_nodes = set()
         self._user_nodes = set()
         self._artist_nodes = set()
         self.enable_multi_layer = enable_multi_layer
     
     def build_from_seed(self, seed_track_id: int, max_depth: int = 2, 
-                       layers: Optional[Set[int]] = None) -> Dict[str, Any]:
+                       layers: Optional[Set[int]] = None,
+                       batch_size: int = 50) -> Dict[str, Any]:
         """
         Build the graph starting from a seed track.
         
@@ -64,6 +66,7 @@ class PersonalGraph:
             seed_track_id: The starting track ID
             max_depth: Maximum depth to expand (number of hops)
             layers: Set of layers to include (1, 2, 3, 4). None = Layer 1 only.
+            batch_size: Number of tracks to process in each batch for better performance
             
         Returns:
             Statistics about the built graph
@@ -74,55 +77,60 @@ class PersonalGraph:
         logger.info(f"Building graph from seed track {seed_track_id}, max_depth={max_depth}, layers={layers}")
         
         visited = set()
-        queue = [(seed_track_id, 0)]
+        queue = collections.deque([(seed_track_id, 0)])
         
         while queue:
-            track_id, depth = queue.pop(0)
+            current_batch = []
+            # Collect batch of tracks to process
+            while queue and len(current_batch) < batch_size:
+                track_id, depth = queue.popleft()
+                if track_id not in visited and depth <= max_depth:
+                    current_batch.append((track_id, depth))
+                    visited.add(track_id)
             
-            if track_id in visited or depth > max_depth:
-                continue
+            if not current_batch:
+                break
             
-            visited.add(track_id)
-            
-            # Add track node
-            track_data = self.cache.get_track(track_id)
-            if not track_data:
-                continue
-            
-            self._add_track_node(track_id, track_data)
-            
-            # Layer 1: Track-to-Track relationships (playlist co-occurrence)
-            if 1 in layers and depth < max_depth:
-                related = self.cache.get_related_tracks(track_id, limit=20)
-                for rel in related:
-                    rel_track_id = rel["track_id"]
-                    weight = rel.get("weight", 1.0)
-                    relation_type = rel.get("relation_type", "related")
-                    
-                    # Add edge
-                    self.graph.add_edge(
-                        track_id, 
-                        rel_track_id,
-                        weight=weight,
-                        relation=relation_type,
-                        layer=1
-                    )
-                    
-                    # Queue for expansion
-                    if rel_track_id not in visited:
-                        queue.append((rel_track_id, depth + 1))
-            
-            # Layer 2: User-to-Track relationships (if enabled)
-            if 2 in layers and self.enable_multi_layer:
-                self._add_layer2_relationships(track_id)
-            
-            # Layer 4: Artist relationships (if enabled)
-            if 4 in layers and self.enable_multi_layer:
-                artist_id = track_data.get("artist_id")
-                if artist_id:
-                    self._add_layer4_relationships(artist_id)
+            # Process batch
+            for track_id, depth in current_batch:
+                track_data = self.cache.get_track(track_id)
+                if not track_data:
+                    continue
+                
+                self._add_track_node(track_id, track_data)
+                
+                # Layer 1: Track-to-Track relationships
+                if 1 in layers and depth < max_depth:
+                    related = self.cache.get_related_tracks(track_id, limit=20)
+                    for rel in related:
+                        rel_track_id = rel["track_id"]
+                        weight = rel.get("weight", 1.0)
+                        relation_type = rel.get("relation_type", "related")
+                        
+                        # Add edge
+                        self.graph.add_edge(
+                            track_id, 
+                            rel_track_id,
+                            weight=weight,
+                            relation=relation_type,
+                            layer=1
+                        )
+                        
+                        # Queue for expansion
+                        if rel_track_id not in visited:
+                            queue.append((rel_track_id, depth + 1))
+                
+                # Layer 2: User-to-Track relationships
+                if 2 in layers and self.enable_multi_layer:
+                    self._add_layer2_relationships(track_id)
+                
+                # Layer 4: Artist relationships
+                if 4 in layers and self.enable_multi_layer:
+                    artist_id = track_data.get("artist_id")
+                    if artist_id:
+                        self._add_layer4_relationships(artist_id)
         
-        # Layer 3: User-to-User relationships (if enabled)
+        # Layer 3: User-to-User relationships (process after all users are added)
         if 3 in layers and self.enable_multi_layer:
             self._add_layer3_relationships()
         
