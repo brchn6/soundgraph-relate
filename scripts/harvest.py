@@ -29,7 +29,7 @@ from loguru import logger
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.sgr.io.soundcloud_client import make_client_from_env, SoundCloudError
+from src.sgr.io.soundcloud_client import make_client_from_env
 from src.sgr.cache.track_cache import TrackCache
 
 
@@ -175,7 +175,7 @@ class DeepHarvestEngine:
         logger.success(f"✓ Resolved: '{track_data.get('title')}' by {artist_name}")
         logger.info(f"  Track ID: {track_id}")
         logger.info(f"  Artist ID: {artist_id}")
-        logger.info(f"  Likes: {track_data.get('likes_count', 0):,}")
+        logger.info(f"  Likes: {track_data.get('likes_count', 0) or track_data.get('favoritings_count', 0):,}")
         logger.info(f"  Plays: {track_data.get('playback_count', 0):,}")
         
         # Cache artist
@@ -240,12 +240,12 @@ class DeepHarvestEngine:
         
         for i, user in enumerate(unique_users, 1):
             user_id = user.get('id')
-            username = user.get('username', 'Unknown')
             
             if user_id in self.processed_users:
                 continue
             
             self.processed_users.add(user_id)
+            username = user.get('username', 'Unknown')
             
             logger.info(f"[{i}/{len(unique_users)}] Processing user: {username} (ID: {user_id})")
             
