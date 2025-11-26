@@ -54,7 +54,7 @@ def make_api_request():
     }
 
     params = {
-        "q": "lofi",  # Search query
+        "q": "BASS HOUSE",  # Search query
         "limit": 50,   # Number of results
         "offset": 0    # Pagination offset
     }
@@ -64,11 +64,13 @@ def make_api_request():
 
     if response.status_code == 200:
         tracks = response.json()
-        print(f"Successfully fetched {len(tracks)} tracks for query 'lofi'.")
+        print(f"Successfully fetched {len(tracks)} tracks for query {params['q']}.")
+
     else:
         print(f"Error: {response.status_code} - {response.text}")
 
-access_token = refresh_access_token()
 
-if access_token:
-    make_api_request()
+if __name__ == "__main__":
+    access_token = refresh_access_token()
+    if access_token:
+        make_api_request()
