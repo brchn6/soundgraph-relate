@@ -28,49 +28,99 @@ graph:
   default_max_tracks: 500
   output_dir: "data/graphs"
 
-# Multi-layer relationship configuration
+# ============================================================
+# DEEP HARVEST ENGINE CONFIGURATION
+# ============================================================
+# Philosophy: "Spill-First, Connect Later"
+# Aggressive data collection to solve sparsity problem
+# Prioritizes complete data lake before relationship building
+# ============================================================
+
+deep_harvest:
+  # Global settings
+  enabled: true
+  request_delay: 0.3  # Seconds between API requests (slower but safer)
+  
+  # Phase 1: User Depth - Exhaustive user engagement crawl
+  user_depth:
+    enabled: true
+    max_users_per_track: 500      # Collect up to 500 likers/reposters (10x increase)
+    max_tracks_per_user: 500      # Fetch up to 500 liked tracks per user (5x increase)
+    include_reposters: true       # Include users who reposted
+    include_commenters: true      # Include users who commented (when available)
+  
+  # Phase 2: Playlist Depth - Complete playlist ecosystem
+  playlist_depth:
+    enabled: true
+    max_playlists: 200            # Harvest up to 200 playlists (10x increase)
+    max_tracks_per_playlist: 500  # No limit on playlist track count (5x increase)
+    include_artist_playlists: true
+    include_liker_playlists: true  # Check playlists from top likers
+  
+  # Phase 3: Artist Depth - Complete discography
+  artist_depth:
+    enabled: true
+    max_artist_tracks: 1000       # Complete discography (no artificial limit)
+    include_remixes: true         # Include remixes by artist
+    include_features: true        # Include tracks where artist is featured
+  
+  # Phase 4: Semantic Depth - Fuzzy name matching
+  semantic_depth:
+    enabled: true
+    fuzzy_search_limit: 100       # Max results per search term
+    name_similarity_threshold: 0.6 # Minimum similarity score (0-1)
+    max_key_terms: 3              # Extract top N key terms from title
+    include_remix_variations: true
+    include_cover_versions: true
+  
+  # Phase 5: Commentary Layer - High-engagement users
+  commentary_layer:
+    enabled: true  # Currently limited by API availability
+    max_commenters: 100
+    min_comment_length: 10        # Filter out short comments
+    harvest_commenter_libraries: true
+  
+  # Phase 6: Label/Network Layer - Entire label catalogs
+  label_layer:
+    enabled: true
+    max_labels_per_track: 3       # Process top 3 detected labels
+    max_catalog_size: 200         # Max tracks to fetch per label
+    detection_methods:
+      - label_field               # Official label field
+      - description_parsing       # Parse from description
+      - publisher_metadata        # Publisher info
+  
+  # Phase 7: Contextual Entity Layer - Mentioned artists/collaborators
+  contextual_layer:
+    enabled: true
+    max_entities: 10              # Process top 10 extracted entities
+    max_tracks_per_entity: 50     # Max tracks per mentioned entity
+    extraction_patterns:
+      - mentions                  # @username patterns
+      - featuring                 # "feat.", "ft.", "featuring"
+      - remixes                   # "remix by", "remixed by"
+      - production                # "prod. by", "produced by"
+
+# ============================================================
+# LEGACY MULTI-LAYER CONFIGURATION (Deprecated)
+# ============================================================
+# The original multi-layer system is now superseded by Deep Harvest
+# This configuration is kept for backward compatibility only
+# ============================================================
+
 multi_layer:
   # Enable/disable specific relationship layers
   enabled_layers:
     layer1_playlist_cooccurrence: true   # Track-to-Track via playlist co-occurrence
-    layer2_user_engagement: true         # User-to-Track via likes/reposts/plays
-    layer3_user_similarity: true         # User-to-User via taste patterns
-    layer4_artist_collaboration: true    # Artist-to-Artist via collaborations
+    layer2_user_engagement: false        # DEPRECATED: Use deep_harvest.user_depth instead
+    layer3_user_similarity: false        # DEPRECATED: Use deep_harvest instead
+    layer4_artist_collaboration: false   # DEPRECATED: Use deep_harvest instead
   
-  # Layer 1: Track co-occurrence (existing)
+  # Layer 1: Track co-occurrence (still used for lightweight mode)
   layer1:
     max_playlists_per_artist: 20
     max_tracks_per_playlist: 100
     min_playback_count: 1000
     depth: 1
-  
-  # Layer 2: User engagement
-  layer2:
-    enabled: true
-    max_likers_per_track: 50           # Max users who liked a track to process
-    max_tracks_per_user: 100           # Max liked tracks to fetch per user
-    min_likes_threshold: 10            # Min likes for a track to process
-    collect_reposts: true              # Collect repost data
-    collect_plays: false               # Collect play counts (if available)
-    depth: 1                           # How many hops to follow user engagements
-  
-  # Layer 3: User similarity
-  layer3:
-    enabled: true
-    min_common_tracks: 3               # Min shared tracks for similarity
-    min_similarity_score: 0.1          # Min Jaccard score to store
-    max_similar_users: 50              # Max similar users to compute per user
-    similarity_metrics:
-      - jaccard_likes                  # Jaccard index on liked tracks
-      # - cosine_taste                 # Cosine similarity (future)
-    collect_follows: true              # Collect user follow relationships
-  
-  # Layer 4: Artist relationships
-  layer4:
-    enabled: true
-    min_collaboration_evidence: 2      # Min evidence for collaboration
-    detect_collaborations: true        # Detect track collaborations
-    detect_co_follows: true            # Detect artists followed by same users
-    detect_co_library: true            # Detect artists in same user libraries
-    max_related_artists: 30            # Max related artists to compute per artist
+
 
