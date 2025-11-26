@@ -62,7 +62,6 @@ refresh_and_request:
 
 # Test /home/barc/dev/soundgraph-relate/tests/test_soundcloud_api.py
 test:
-	make refresh_and_request
 	python  tests/test_soundcloud_api.py
 
 # Doctor script for checking the system health
